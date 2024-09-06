@@ -1,4 +1,4 @@
-﻿/*************************************************************************
+/*************************************************************************
  *  Copyright (C) 2024 -2099 URS. All rights reserved.
  *------------------------------------------------------------------------
  *  File         :  UnityNDrawr.cs
@@ -832,6 +832,7 @@ namespace NDraw
             }
         }
     }
+
     public static partial class NDrawHelper
     {
         public static partial class Screen
@@ -922,6 +923,180 @@ namespace NDraw
                     }
                 }
             }
+        }
+    }
+
+    public static partial class NDrawHelper
+    {
+        /// <summary>
+        /// 扩展
+        /// </summary>
+        public static partial class World
+        {
+            /// <summary>
+            /// 圆锥体
+            /// </summary>
+            /// <param name="position"></param>
+            /// <param name="direction"></param>
+            /// <param name="color"></param>
+            /// <param name="angle"></param>
+            public static void Cone(Vector3 position, Vector3 direction, float angle = 45) {
+                float length = direction.magnitude;
+
+                Vector3 _forward = direction;
+                Vector3 _up = Vector3.Slerp(_forward, -_forward, 0.5f);
+                Vector3 _right = Vector3.Cross(_forward, _up).normalized * length;
+
+                direction = direction.normalized;
+
+                Vector3 slerpedVector = Vector3.Slerp(_forward, _up, angle / 90.0f);
+
+                float dist;
+                var farPlane = new Plane(-direction, position + _forward);
+                var distRay = new Ray(position, slerpedVector);
+
+                farPlane.Raycast(distRay, out dist);
+
+                Ray(position, slerpedVector.normalized * dist);
+                Ray(position, Vector3.Slerp(_forward, -_up, angle / 90.0f).normalized * dist);
+                Ray(position, Vector3.Slerp(_forward, _right, angle / 90.0f).normalized * dist);
+                Ray(position, Vector3.Slerp(_forward, -_right, angle / 90.0f).normalized * dist);
+
+                Circle(position + _forward, (_forward - (slerpedVector.normalized * dist)).magnitude, direction);
+                Circle(position + (_forward * 0.5f), ((_forward * 0.5f) - (slerpedVector.normalized * (dist * 0.5f))).magnitude, direction);
+            }
+            /// <summary>
+            /// 箭头
+            /// </summary>
+            /// <param name="position"></param>
+            /// <param name="direction"></param>
+            public static void Arrow(Vector3 position, Vector3 direction) {
+                Ray(position, direction);
+                Cone(position + direction, -direction * 0.333f, 15f);
+            }
+            /// <summary>
+            /// 胶囊
+            /// </summary>
+            /// <param name="start"></param>
+            /// <param name="end"></param>
+            /// <param name="color"></param>
+            /// <param name="radius"></param>
+            /// <param name="duration"></param>
+            /// <param name="depthTest"></param>
+            public static void Capsule(Vector3 start, Vector3 end, float radius = 1) {
+                Vector3 up = (end - start).normalized * radius;
+                Vector3 forward = Vector3.Slerp(up, -up, 0.5f);
+                Vector3 right = Vector3.Cross(up, forward).normalized * radius;
+
+                float height = (start - end).magnitude;
+                float sideLength = Mathf.Max(0, (height * 0.5f) - radius);
+                Vector3 middle = (end + start) * 0.5f;
+
+                start = middle + ((start - middle).normalized * sideLength);
+                end = middle + ((end - middle).normalized * sideLength);
+
+                //Radial circles
+                Circle(start, radius, up);
+                Circle(end, radius, -up);
+
+                //Side lines
+                Line(start + right, end + right);
+                Line(start - right, end - right);
+
+                Line(start + forward, end + forward);
+                Line(start - forward, end - forward);
+
+                for (int i = 1; i < 26; i++) {
+
+                    //Start endcap
+                    Line(Vector3.Slerp(right, -up, i / 25.0f) + start, Vector3.Slerp(right, -up, (i - 1) / 25.0f) + start);
+                    Line(Vector3.Slerp(-right, -up, i / 25.0f) + start, Vector3.Slerp(-right, -up, (i - 1) / 25.0f) + start);
+                    Line(Vector3.Slerp(forward, -up, i / 25.0f) + start, Vector3.Slerp(forward, -up, (i - 1) / 25.0f) + start);
+                    Line(Vector3.Slerp(-forward, -up, i / 25.0f) + start, Vector3.Slerp(-forward, -up, (i - 1) / 25.0f) + start);
+
+                    //End endcap
+                    Line(Vector3.Slerp(right, up, i / 25.0f) + end, Vector3.Slerp(right, up, (i - 1) / 25.0f) + end);
+                    Line(Vector3.Slerp(-right, up, i / 25.0f) + end, Vector3.Slerp(-right, up, (i - 1) / 25.0f) + end);
+                    Line(Vector3.Slerp(forward, up, i / 25.0f) + end, Vector3.Slerp(forward, up, (i - 1) / 25.0f) + end);
+                    Line(Vector3.Slerp(-forward, up, i / 25.0f) + end, Vector3.Slerp(-forward, up, (i - 1) / 25.0f) + end);
+                }
+            }
+            /// <summary>
+            /// 圆柱
+            /// </summary>
+            /// <param name="start"></param>
+            /// <param name="end"></param>
+            /// <param name="color"></param>
+            /// <param name="radius"></param>
+            /// <param name="duration"></param>
+            /// <param name="depthTest"></param>
+            public static void Cylinder(Vector3 start, Vector3 end, float radius = 1) {
+                Vector3 up = (end - start).normalized * radius;
+                Vector3 forward = Vector3.Slerp(up, -up, 0.5f);
+                Vector3 right = Vector3.Cross(up, forward).normalized * radius;
+
+                //Radial circles
+                Circle(start, radius, up);
+                Circle(end, radius, -up);
+                Circle((start + end) * 0.5f, radius, up);
+
+                //Side lines
+                Line(start + right, end + right);
+                Line(start - right, end - right);
+
+                Line(start + forward, end + forward);
+                Line(start - forward, end - forward);
+
+                //Start endcap
+                Line(start - right, start + right);
+                Line(start - forward, start + forward);
+
+                //End endcap
+                Line(end - right, end + right);
+                Line(end - forward, end + forward);
+            }
+            /// <summary>
+            /// 球
+            /// </summary>
+            /// <param name="position"></param>
+            /// <param name="color"></param>
+            /// <param name="radius"></param>
+            /// <param name="duration"></param>
+            /// <param name="depthTest"></param>
+            public static void Sphere(Vector3 position, float radius = 1.0f) {
+                float angle = 10.0f;
+
+                Vector3 x = new Vector3(position.x, position.y + radius * Mathf.Sin(0), position.z + radius * Mathf.Cos(0));
+                Vector3 y = new Vector3(position.x + radius * Mathf.Cos(0), position.y, position.z + radius * Mathf.Sin(0));
+                Vector3 z = new Vector3(position.x + radius * Mathf.Cos(0), position.y + radius * Mathf.Sin(0), position.z);
+
+                Vector3 new_x;
+                Vector3 new_y;
+                Vector3 new_z;
+
+                for (int i = 1; i < 37; i++) {
+
+                    new_x = new Vector3(position.x, position.y + radius * Mathf.Sin(angle * i * Mathf.Deg2Rad), position.z + radius * Mathf.Cos(angle * i * Mathf.Deg2Rad));
+                    new_y = new Vector3(position.x + radius * Mathf.Cos(angle * i * Mathf.Deg2Rad), position.y, position.z + radius * Mathf.Sin(angle * i * Mathf.Deg2Rad));
+                    new_z = new Vector3(position.x + radius * Mathf.Cos(angle * i * Mathf.Deg2Rad), position.y + radius * Mathf.Sin(angle * i * Mathf.Deg2Rad), position.z);
+
+                    Line(x, new_x);
+                    Line(y, new_y);
+                    Line(z, new_z);
+
+                    x = new_x;
+                    y = new_y;
+                    z = new_z;
+                }
+            }
+
+            public static void Point(Vector3 position, float scale = 1.0f) {
+
+                Ray(position + (Vector3.up * (scale * 0.5f)), -Vector3.up * scale);
+                Ray(position + (Vector3.right * (scale * 0.5f)), -Vector3.right * scale);
+                Ray(position + (Vector3.forward * (scale * 0.5f)), -Vector3.forward * scale);
+            }
+
         }
     }
 }
