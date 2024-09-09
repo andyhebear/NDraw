@@ -24,7 +24,7 @@ using System.Text;
 using UnityEngine;
 
 namespace NDraw
-{ 
+{
 #if NDRAW_UPDATE_IN_CAMERA
     [RequireComponent(typeof(Camera))]
 #endif
@@ -553,6 +553,21 @@ namespace NDraw
                     screenPoints.Add(offset + points[i + 1] * scale);
                 }
             }
+            public static void LineArrow(Vector2 start, Vector2 end,  float arrowHeadLength = 0.25f, float arrowHeadAngle = 20) {
+                DrawArrow(start, end - start,  arrowHeadLength, arrowHeadAngle);
+            }
+
+            // Draw an arrow from start to start + dir with color for a duration of time and with or without depth testing.
+            // If duration is 0 then the arrow is rendered 1 frame.
+            public static void DrawArrow(Vector2 start, Vector2 dir,  float arrowHeadLength = 0.25f, float arrowHeadAngle = 20) {
+                if (dir == Vector2.zero)
+                    return;
+                Line(start, dir);
+                Vector3 right = Quaternion.LookRotation(dir) * Quaternion.Euler(0, 180 + arrowHeadAngle, 0) * Vector3.forward;
+                Vector3 left = Quaternion.LookRotation(dir) * Quaternion.Euler(0, 180 - arrowHeadAngle, 0) * Vector3.forward;
+                Line(start + dir, right * arrowHeadLength);
+                Line(start + dir, left * arrowHeadLength);
+            }
         }
 
         public static partial class World
@@ -657,6 +672,10 @@ namespace NDraw
     {
         public static partial class Screen
         {
+            public static void Cross(Vector2 pos, float size) {
+                Line(pos + (new Vector2(+1, +1) * size), (new Vector2(-2, -2) * size));
+                Line(pos + (new Vector2(+1, -1) * size), (new Vector2(-2, +2) * size));
+            }
             public static void Rect(Rect rect) {
                 if (!UnityNDrawer.Exists) return;
 
@@ -821,6 +840,55 @@ namespace NDraw
 
         public static partial class World
         {
+            public static void Bounds(Bounds bounds, Quaternion rotate, Vector3 offset) {
+                Vector3 c = bounds.center+offset;
+
+                var size = bounds.size;
+                float rx = size.x / 2f;
+                float ry = size.y / 2f;
+                float rz = size.z / 2f;
+                //获取collider边界的8个顶点位置
+                Vector3 p0, p1, p2, p3;
+                Vector3 p4, p5, p6, p7;
+                //顶部4个点
+                //       /p4-------------------/p5
+                //      /                     /
+                //     /                     /
+                //    /                     /
+                //   /                     /
+                //  /p7-------------------/p6
+                p4 = c + rotate * new Vector3(-rx, ry, rz);
+                p5 = c + rotate * new Vector3(rx, ry, rz);
+                p6 = c + rotate * new Vector3(rx, ry, -rz);
+                p7 = c + rotate * new Vector3(-rx, ry, -rz);
+                //底部4个点
+                //       /p0-------------------/p1
+                //      /                     /
+                //     /                     /
+                //    /                     /
+                //   /                     /
+                //  /p3-------------------/p2
+                p0 = c + rotate * new Vector3(-rx, -ry, rz);
+                p1 = c + rotate * new Vector3(rx, -ry, rz);
+                p2 = c + rotate * new Vector3(rx, -ry, -rz);
+                p3 = c + rotate * new Vector3(-rx, -ry, -rz);
+
+                Line(p0, p1);
+                Line(p1, p2);
+                Line(p2, p3);
+                Line(p3, p0);
+                            
+                Line(p4, p5);
+                Line(p5, p6);
+                Line(p6, p7);
+                Line(p7, p4);
+                            
+                Line(p0, p4);
+                Line(p1, p5);
+                Line(p2, p6);
+                Line(p3, p7);
+            }
+
             public static void Cube(Vector3 center, Vector3 size, Vector3 forward, Vector3 up) {
                 if (!UnityNDrawer.Exists) return;
 
@@ -1228,4 +1296,58 @@ namespace NDraw
 
         }
     }
+    public static partial class NDrawHelper
+    {
+        public static partial class World {
+            public static Bounds GetBounds(Transform target, bool zeroTransform, bool include_children = true) {
+                Vector3 oldPos = target.position;
+                Quaternion oldQuat = target.rotation;
+                if (zeroTransform) {
+                    target.position = Vector3.zero;
+                    target.rotation = Quaternion.identity;
+                }
+                //
+                Renderer[] mrs = target.GetComponentsInChildren<Renderer>();
+                Vector3 center = target.position;
+                Bounds bounds = new Bounds(center, Vector3.zero);
+                if (include_children) {
+                    if (mrs.Length != 0) {
+                        foreach (Renderer mr in mrs) {
+                            bounds.Encapsulate(mr.bounds);
+                        }
+                    }
+                }
+                else {
+                    Renderer rend = target.GetComponentInChildren<Renderer>();
+                    if (rend) {
+                        bounds = rend.bounds;
+                    }
+                }
+                //
+                if (zeroTransform) {
+                    target.rotation = oldQuat;
+                    target.position = oldPos;
+                }
+                Vector3 scalueValue = scaleValue(target); ;
+                bounds.size = new Vector3(bounds.size.x / scalueValue.x, bounds.size.y / scalueValue.y, bounds.size.z / scalueValue.z);
+
+                //
+                return bounds;
+            }
+            private static Vector3 scaleValue(Transform model) {
+                Vector3 result = model.localScale;
+                return calculateScale(model, ref result);
+            }
+
+            private static Vector3 calculateScale(Transform model, ref Vector3 value) {
+                if (model.parent) {
+                    Vector3 scale = model.parent.localScale;
+                    value = new Vector3(value.x * scale.x, value.y * scale.y, value.z * scale.z);
+                    calculateScale(model.parent, ref value);
+                }
+                return value;
+            }
+        }
+    }
+
 }
