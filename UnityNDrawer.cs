@@ -43,7 +43,15 @@ namespace NDraw
         }
 
         static readonly Vector2 one = Vector2.one;
-
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void RuntimeInit() {
+           var instance = FindAnyObjectByType<UnityNDrawer>( FindObjectsInactive.Include);
+            if (instance == null) {
+                var go = new GameObject { name = "[UnityNDrawer]" };
+                instance = go.AddComponent<UnityNDrawer>();
+                DontDestroyOnLoad(go);
+            }
+        }
         //private void Awake() {
         //    e = this;            
         //}
@@ -181,6 +189,7 @@ namespace NDraw
             }
         }
 #endif
+        
         void CreateLineMaterial() {
             //
             Shader shader = Shader.Find("Hidden/Internal-Colored");
