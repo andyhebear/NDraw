@@ -9,7 +9,13 @@
  *  Date         :  2024/9/6
  *  Description  :  Initial development version.
  *************************************************************************/
+//#define NDRAW_UPDATE_IN_CAMERA
+#define NDRAW_UPDATE_IN_RENDEROBJECT
+//#define NDRAW_ORHTO_MULTIPLICATION //使用0~1相对值
 //#define NDRAW_UPDATE_IN_COROUTINE
+#if UNITY_EDITOR
+//#define NDRAW_DEBUG_TEST
+#endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,24 +23,36 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace NDraw
+namespace IRobotQ.Core.U3D
 {
+#if NDRAW_UPDATE_IN_CAMERA
     [RequireComponent(typeof(Camera))]
+#endif
     public class UnityNDrawer : MonoBehaviour
     {
-        static UnityNDrawer e;
-
+        //static UnityNDrawer e;
+        static List<UnityNDrawer> m_NDraws = new List<UnityNDrawer>();
         static Material material;
         new Camera camera;
 
-        public static bool Exists { get { return e != null && e.enabled; } }
+        public static bool Exists {
+            get {
+                return m_NDraws.Count > 0;
+                //return e != null && e.enabled; 
+            }
+        }
 
         static readonly Vector2 one = Vector2.one;
 
-        private void Awake() {
-            e = this;
+        //private void Awake() {
+        //    e = this;            
+        //}
+        private void OnEnable() {
+            m_NDraws.Add(this);
         }
-
+        private void OnDisable() {
+            m_NDraws.Remove(this);
+        }
         protected virtual void Start() {
             if (material == null)
                 CreateLineMaterial();
@@ -44,40 +62,128 @@ namespace NDraw
 #if NDRAW_UPDATE_IN_COROUTINE
             StartCoroutine(PostRender());
 #endif
+
+#if NDRAW_DEBUG_TEST
+            multilinePoints = new Vector2[100];
+
+            for (int i = 0; i < multilinePoints.Length; i++) {
+                multilinePoints[i] = new Vector2(200, 400) + UnityEngine.Random.insideUnitCircle * 200;
+            }
+#endif
         }
+#if NDRAW_DEBUG_TEST
+        Vector2[] multilinePoints;
+        bool screenExamples = true;
+        bool worldExamples = true;
+        void Update() {
+            if (screenExamples) {
+                NDrawHelper.Screen.Line(140, 10, 240, 200);
+                NDrawHelper.Screen.SetColor(Color.black);
+                NDrawHelper.Screen.Line(new Vector2(150, 10), new Vector2(250, 200));
 
-        private void OnDestroy() {
-            NDrawHelper.Clear();
+                NDrawHelper.Screen.SetColor(Color.blue);
+                NDrawHelper.Screen.Ellipse(new Vector2(500, 500), new Vector2(100, 200));
+
+                NDrawHelper.Screen.SetColor(Color.cyan);
+                NDrawHelper.Screen.Ellipse(new Vector2(550, 500), new Vector2(130, 200));
+
+                NDrawHelper.Screen.SetColor(Color.yellow);
+                NDrawHelper.Screen.Rect(10, 10, 100, 200);
+                NDrawHelper.Screen.SetColor(Color.cyan);
+                NDrawHelper.Screen.Rect(new Rect(20, 20, 100, 200));
+
+                NDrawHelper.Screen.SetColor(Color.red);
+                NDrawHelper.Screen.MultiLine(multilinePoints);
+
+                NDrawHelper.Screen.SetColor(Color.yellow);
+                NDrawHelper.Screen.Circle(600, 230, 200);
+
+                NDrawHelper.Screen.Grid(10, 10, new Rect(600, 100, 250, 200));
+
+                NDrawHelper.Screen.SetFillColor(new Color(0, 1, 0, 0.1f));
+                NDrawHelper.Screen.FillRect(500, 500, 100, 200);
+
+                NDrawHelper.Screen.SetFillColor(new Color(0, 1, 1, 0.1f));
+                NDrawHelper.Screen.FillRect(100, 500, 100, 200);
+
+                float pieValue = Mathf.Sin(Time.time / 2) * 2;
+                if (pieValue < 0)
+                    NDrawHelper.Screen.SetFillColor(new Color(1, 0, 0, 0.5f));
+                else NDrawHelper.Screen.SetFillColor(new Color(1, 0.5f, 0, 0.5f));
+
+                NDrawHelper.Screen.Pie(200, 200, 20, 40, pieValue);
+                // outline test
+                //Draw.Screen.SetFillColor(Color.black);
+                //Draw.Screen.Pie(200, 200, 19, 20, pieValue);
+                //Draw.Screen.Pie(200, 200, 40, 41, pieValue);
+
+                NDrawHelper.Screen.Pie(200, 200, 45, 50, -pieValue);
+
+                NDrawHelper.Screen.Slider(pieValue * 0.5f, 200, 50, Color.red, 200);
+                NDrawHelper.Screen.MidSlider(pieValue * 0.5f, 200, 60, Color.blue, 200);
+            }
+
+            // 3D
+
+            if (worldExamples) {
+                NDrawHelper.World.Line(Vector3.zero, Vector3.forward * 100);
+
+                NDrawHelper.World.SetColor(Color.magenta);
+                NDrawHelper.World.Cube(Vector3.zero, Vector3.one * 10, Vector3.forward, Vector3.up);
+
+                NDrawHelper.World.SetColor(Color.red);
+                NDrawHelper.World.Cube(Vector3.zero, Vector3.one, Vector3.forward, Vector3.up);
+
+                NDrawHelper.World.Circle(Vector3.forward * 5, 10, Vector3.up);
+                NDrawHelper.World.SetColor(Color.cyan);
+                NDrawHelper.World.Circle(Vector3.right * 5, 10, Vector3.up);
+
+                NDrawHelper.World.SetColor(new Color(0, 1, 0, 0.4f));
+                for (float e = 0.1f; e < 1.6f; e += 0.1f) {
+                    NDrawHelper.World.ConicSectionUsingApses(new Vector3(1, 1, 1), 1, e * 10, Vector3.forward, Vector3.right, 40);
+                }
+            }
         }
+#endif
+  
 
-        WaitForEndOfFrame wof = new WaitForEndOfFrame();
 
-#if !NDRAW_UPDATE_IN_COROUTINE
+#if NDRAW_UPDATE_IN_CAMERA
         private void OnPostRender() {
             if (enabled)
-                Render();
+                Render_OnPostRender(this.camera);
 
             NDrawHelper.Clear();
         }
 
-#endif
-
-#if NDRAW_UPDATE_IN_COROUTINE
+#elif NDRAW_UPDATE_IN_COROUTINE
+        WaitForEndOfFrame wof = new WaitForEndOfFrame();
         IEnumerator PostRender()
         {
             while (true)
             {
-                yield return wof;
-
-                if (enabled)
-                    Render();
-
+                yield return wof;  
+                if (enabled){
+#if NDRAW_UPDATE_IN_RENDEROBJECT
+                    Render_OnRenderObject();
+#else           
+                    Render_OnPostRender(this.camera);
+#endif
+                }
                 NDrawHelper.Clear();
             }
+        }
+#elif NDRAW_UPDATE_IN_RENDEROBJECT
+        void OnRenderObject() {
+            if (enabled)
+                Render_OnRenderObject();
+
+            NDrawHelper.Clear();
         }
 #endif
 
         void CreateLineMaterial() {
+            //
             Shader shader = Shader.Find("Hidden/Internal-Colored");
             material = new Material(shader);
             //material.hideFlags = HideFlags.HideAndDontSave;
@@ -93,7 +199,7 @@ namespace NDraw
             material.SetInt("_ZTest", 0);
         }
 
-        protected void Render() {
+        protected void Render_OnPostRender(Camera camera) {
             material.SetPass(0);
 
             //-------------
@@ -134,7 +240,18 @@ namespace NDraw
             GL.PopMatrix();
 
         }
+        void Render_OnRenderObject() {
 
+            //if ((Camera.current.cullingMask & debugLayers) == 0) return;
+            //if (Camera.current.tag != "MainCamera") return;
+            //if (Camera.current.name != "MainCamera")return;            
+            if (Camera.current != Camera.main) return;
+            //material.SetPass(0);
+            //GL.PushMatrix();
+            ////这里无需将矩阵从本地坐标转化为世界左边
+            ////GL.MultMatrix(localToWorldMatrix);
+            Render_OnPostRender(Camera.main);
+        }
         static void ProcessPoints(List<Vector3> points, List<NDrawHelper.ColorIndex> colorIndices, bool screen) {
             if (points.Count == 0) return;
 
@@ -171,6 +288,10 @@ namespace NDraw
         protected void ClearLines() {
             NDrawHelper.Clear();
         }
+        private void OnDestroy() {
+            NDrawHelper.Clear();
+        }
+
     }
     public static partial class NDrawHelper
     {
