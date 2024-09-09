@@ -23,8 +23,8 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace IRobotQ.Core.U3D
-{
+namespace NDraw
+{ 
 #if NDRAW_UPDATE_IN_CAMERA
     [RequireComponent(typeof(Camera))]
 #endif
@@ -34,7 +34,7 @@ namespace IRobotQ.Core.U3D
         static List<UnityNDrawer> m_NDraws = new List<UnityNDrawer>();
         static Material material;
         new Camera camera;
-
+        public static Camera RenderCamera;
         public static bool Exists {
             get {
                 return m_NDraws.Count > 0;
@@ -56,8 +56,10 @@ namespace IRobotQ.Core.U3D
         protected virtual void Start() {
             if (material == null)
                 CreateLineMaterial();
-
+#if NDRAW_UPDATE_IN_CAMERA
             camera = GetComponent<Camera>();
+            RenderCamera=camera;
+#endif
 
 #if NDRAW_UPDATE_IN_COROUTINE
             StartCoroutine(PostRender());
@@ -145,7 +147,7 @@ namespace IRobotQ.Core.U3D
             }
         }
 #endif
-  
+
 
 
 #if NDRAW_UPDATE_IN_CAMERA
@@ -155,24 +157,6 @@ namespace IRobotQ.Core.U3D
 
             NDrawHelper.Clear();
         }
-
-#elif NDRAW_UPDATE_IN_COROUTINE
-        WaitForEndOfFrame wof = new WaitForEndOfFrame();
-        IEnumerator PostRender()
-        {
-            while (true)
-            {
-                yield return wof;  
-                if (enabled){
-#if NDRAW_UPDATE_IN_RENDEROBJECT
-                    Render_OnRenderObject();
-#else           
-                    Render_OnPostRender(this.camera);
-#endif
-                }
-                NDrawHelper.Clear();
-            }
-        }
 #elif NDRAW_UPDATE_IN_RENDEROBJECT
         void OnRenderObject() {
             if (enabled)
@@ -181,7 +165,22 @@ namespace IRobotQ.Core.U3D
             NDrawHelper.Clear();
         }
 #endif
-
+#if NDRAW_UPDATE_IN_COROUTINE
+        WaitForEndOfFrame wof = new WaitForEndOfFrame();
+        IEnumerator PostRender() {
+            while (true) {
+                yield return wof;
+                if (enabled) {
+#if NDRAW_UPDATE_IN_RENDEROBJECT
+                    Render_OnRenderObject();
+#else
+                    Render_OnPostRender(this.camera);
+#endif
+                }
+                NDrawHelper.Clear();
+            }
+        }
+#endif
         void CreateLineMaterial() {
             //
             Shader shader = Shader.Find("Hidden/Internal-Colored");
@@ -241,16 +240,25 @@ namespace IRobotQ.Core.U3D
 
         }
         void Render_OnRenderObject() {
-
-            //if ((Camera.current.cullingMask & debugLayers) == 0) return;
-            //if (Camera.current.tag != "MainCamera") return;
-            //if (Camera.current.name != "MainCamera")return;            
-            if (Camera.current != Camera.main) return;
-            //material.SetPass(0);
-            //GL.PushMatrix();
-            ////这里无需将矩阵从本地坐标转化为世界左边
-            ////GL.MultMatrix(localToWorldMatrix);
-            Render_OnPostRender(Camera.main);
+            if (RenderCamera != null) {
+                if (Camera.current != RenderCamera) return;
+                //material.SetPass(0);
+                //GL.PushMatrix();
+                ////这里无需将矩阵从本地坐标转化为世界左边
+                ////GL.MultMatrix(localToWorldMatrix);
+                Render_OnPostRender(RenderCamera);
+            }
+            else {
+                //if ((Camera.current.cullingMask & debugLayers) == 0) return;
+                //if (Camera.current.tag != "MainCamera") return;
+                //if (Camera.current.name != "MainCamera")return;            
+                if (Camera.current != Camera.main) return;
+                //material.SetPass(0);
+                //GL.PushMatrix();
+                ////这里无需将矩阵从本地坐标转化为世界左边
+                ////GL.MultMatrix(localToWorldMatrix);
+                Render_OnPostRender(Camera.main);
+            }
         }
         static void ProcessPoints(List<Vector3> points, List<NDrawHelper.ColorIndex> colorIndices, bool screen) {
             if (points.Count == 0) return;
